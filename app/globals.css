@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Motion: staggered card entrances, growing traction bars, expand reveal */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes expand-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+.card-in { animation: card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.bar-grow { transform-origin: left; animation: bar-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.expand-in { animation: expand-in 0.25s ease-out both; }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* SnapChat mascot: idle tail swish + occasional blink */
+@keyframes cat-tail-swish {
+  0%, 100% { transform: rotate(6deg); }
+  50% { transform: rotate(-22deg); }
+}
+.cat-tail {
+  transform-box: fill-box;
+  transform-origin: 15% 85%;
+  animation: cat-tail-swish 2.8s ease-in-out infinite;
+}
+@keyframes cat-blink {
+  0%, 90%, 96%, 100% { transform: scaleY(1); }
+  93% { transform: scaleY(0.12); }
+}
+.cat-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cat-blink 4.5s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-in, .bar-grow, .expand-in, .cat-tail, .cat-eyes { animation: none; }
+}
