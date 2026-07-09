@@ -59,17 +59,9 @@ export const TYPE_ACCENT: Record<ItemType, string> = {
 };
 
 // Frontier-lab shortcuts: one tap filters the current tab to a company's
-// models, papers, and coverage. Regexes run over title+summary+source+url.
-export const LABS: { id: string; label: string; re: RegExp }[] = [
-  { id: "openai", label: "OpenAI", re: /openai|\bgpt-?\d|chatgpt|\bcodex\b|\bsora\b/i },
-  { id: "anthropic", label: "Anthropic", re: /anthropic|claude|\bfable\b|\bmythos\b|\bopus\b|\bsonnet\b|\bhaiku\b/i },
-  { id: "google", label: "Google", re: /google|gemini|deepmind|\bgemma\b/i },
-  { id: "meta", label: "Meta", re: /\bmeta\b|\bllama\b|zuckerberg|\bmuse\b/i },
-  { id: "xai", label: "xAI", re: /\bxai\b|\bgrok\b/i },
-  { id: "deepseek", label: "DeepSeek", re: /deepseek/i },
-  { id: "qwen", label: "Qwen", re: /\bqwen|alibaba/i },
-  { id: "mistral", label: "Mistral", re: /mistral/i },
-];
+// models, papers, and coverage. The list lives in lib/editorial.ts because
+// the server-side digest watchlist uses the same regexes.
+export { LABS } from "@/lib/editorial";
 
 // Brand-ish hues per traction source, for scannable "where is this trending".
 export const SOURCE_THEME: Record<string, { label: string; chip: string }> = {

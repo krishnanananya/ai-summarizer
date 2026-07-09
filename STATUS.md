@@ -21,11 +21,12 @@ Empty tabs are hidden from the nav automatically (`/api/items` reports them `ena
 
 Per-tab: search, time-window filter, sort modes (Top / New / Discussed / Weeks), source chips, frontier-lab shortcut chips (OpenAI, Anthropic, Google, …), new-since-last-visit badges and dividers, bookmark-to-save on every card and tile.
 
-### Daily catch-up loop (added 2026-07-07)
+### Daily catch-up loop (added 2026-07-07, story digest 2026-07-09)
 
-- **Daily brief**: refresh makes a non-streaming Gemini call over the top items of every tab and stores 4–6 bullets in the cached blob (`blob.brief`); rendered as a violet card at the top of Today. Fail-soft: no key / timeout / quota error skips it.
+- **Story digest** (replaced the bullet brief on 2026-07-09): refresh sends Gemini traction-ranked candidates per tab **plus all ≤3-day-old frontier-lab watchlist hits** (force-included regardless of traction — brand-new releases have no points yet) with an editorial rubric: frontier-lab releases first, then policy/safety, then papers/benchmarks, then high-traction misc. Returns 4–6 ranked stories as JSON (`{headline, why, ids[]}`, `blob.digest`), grouping a launch article + weights + thread into one story. Fail-soft; ids are validated against the cache.
+- **Watchlist** lives in `lib/editorial.ts`: lab regexes (shared with the UI filter chips — includes model codenames like Sol/Terra/Luna) + release-language regex; any lab-matching model item counts. **Tune importance here** (regexes) and in the rubric text in `lib/brief.ts`.
+- **Today layout** (2026-07-09): inverted pyramid — lead story (17px headline + why + source-chip links + 3-step relative-traction meter ▮▮▮), numbered stories 2–6, "Also on the radar" one-liners, Saved for later. "New since last visit" is a violet ● badge on stories (rank stays editorial); fully-read stories dim. No digest in the blob → falls back to the previous Since-your-last-visit / Still-trending tile grid.
 - **Summary backfill**: second Gemini call writes one-sentence summaries into the top ~40 articles that arrived title-only (HN). Both calls run in parallel with 15s timeouts and `thinkingBudget: 0`.
-- **Since your last visit / Still trending**: Today partitions tiles by the visit boundary instead of just preferring new items; cross-section dedup by id + near-duplicate title.
 - **✓ Caught up** button (header, shown when anything is new) advances the visit boundary to now — clears all badges without waiting out the 30-min session gap.
 - **Manual refresh button** (header, added 2026-07-09): POST `/api/refresh` needs no secret — debounced server-side (no-op under 30-min blob age, returns `fresh`) plus a Redis NX / module-state lock against concurrent runs; the cron GET keeps its `CRON_SECRET`. Spinner runs for the ~20–40s pipeline, then the client re-pulls `/api/items`.
 - **Saved for later**: bookmark toggle on cards and tiles stores snapshots (`{id,type,title,url,savedAt}`, cap 100) in localStorage so links outlive feed windows; listed with remove buttons at the bottom of Today.

@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CachedBlob, Item, ItemType } from "@/lib/types";
+import type { CachedBlob, DigestStory, Item, ItemType } from "@/lib/types";
 import { useVisit } from "@/lib/visit";
 import { useSwipeNav } from "./useSwipeNav";
 import ItemCard from "./ItemCard";
@@ -35,7 +35,7 @@ interface ApiPayload {
   generatedAt: string | null;
   tabs: CachedBlob["tabs"];
   llmDeltaDays: number | null;
-  brief: { bullets: string[] } | null;
+  digest: { stories: DigestStory[] } | null;
   config: Record<ItemType, TabMeta>;
 }
 
@@ -454,7 +454,7 @@ export default function RadarApp() {
       )}
 
       {isBrief && data && (
-        <Briefing tabs={data.tabs} visit={visit} brief={data.brief} />
+        <Briefing tabs={data.tabs} visit={visit} digest={data.digest} />
       )}
       {!isBrief && isLeaderboard ? (
         <LlmBoard

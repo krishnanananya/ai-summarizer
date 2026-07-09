@@ -1,19 +1,24 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import type { CachedBlob, Item, ItemType } from "@/lib/types";
+import type { CachedBlob, DigestStory, Item, ItemType } from "@/lib/types";
 import type { Visit } from "@/lib/visit";
 import { BookmarkButton, relDate, topSignalLabel } from "./ItemCard";
 import { BRIEF_THEME, SOURCE_THEME, TYPE_THEME, primarySource } from "./theme";
 
-// The "Today" tab, structured as three reading speeds for the daily
-// check-in: (1) the Gemini-written brief — the 60-second version; (2) tile
-// sections — "Since your last visit" first, then "Still trending" — the
-// 5-minute scan; (3) the tabs below as the deep dive. Tiles link straight
-// to the source (no expand step). Selection drops near-duplicate stories
-// that surface on several tabs at once (a model launch is typically an
-// article + an HF model + a thread). A "Saved" list of bookmarked items
-// closes the loop for reads that don't fit in the daily window.
+// The "Today" tab as an inverted pyramid for the daily check-in: a lead
+// story with the most visual weight, ranked stories 2-N below it, then an
+// "Also on the radar" layer of one-liners, then the saved-for-later list.
+// Stories come from the refresh-time Gemini digest (which groups a launch
+// article + its weights + its thread into one story and applies the
+// frontier-lab watchlist in lib/editorial.ts); the client attaches links,
+// chips, and traction by resolving the story's item ids. When the digest
+// is absent (no key / quota / old cache), the page falls back to the
+// type-grouped tile grid below. "New since your last visit" is a badge on
+// stories rather than a separate section — rank order stays editorial.
+
+// ---------- Fallback tile grid ----------
+
 const SECTIONS: { type: ItemType; label: string; take: number; hero: boolean }[] =
   [
     { type: "article", label: "News", take: 3, hero: true },
@@ -22,12 +27,19 @@ const SECTIONS: { type: ItemType; label: string; take: number; hero: boolean }[]
     { type: "discussion", label: "Discussions", take: 2, hero: false },
   ];
 
-// Caps for the new-since-last-visit block: a bit roomier than the trending
-// grid, since "everything new to you" is the app's core promise.
 const NEW_TAKE: Record<ItemType, number> = {
   article: 4,
   paper: 4,
   model: 3,
+  llm: 0,
+  discussion: 2,
+};
+
+// "Also on the radar" breadth per type in digest mode.
+const RADAR_TAKE: Record<ItemType, number> = {
+  article: 2,
+  paper: 3,
+  model: 2,
   llm: 0,
   discussion: 2,
 };
@@ -182,20 +194,227 @@ function TileGrid({ groups, visit }: { groups: SectionGroup[]; visit: Visit }) {
   );
 }
 
+// ---------- Digest (story) layout ----------
+
+interface ResolvedStory extends DigestStory {
+  items: Item[]; // ids resolved against the cached tabs; [0] = primary
+}
+
+// Relative traction of the story's primary item within its own tab,
+// as a 3-step meter — "how loud is this" at a glance, no numbers.
+function tractionTier(it: Item, tabs: CachedBlob["tabs"]): number {
+  const max = Math.max(
+    ...(tabs[it.type]?.items ?? []).map((i) => i.tractionScore),
+    0.001
+  );
+  const r = it.tractionScore / max;
+  return r >= 0.6 ? 3 : r >= 0.25 ? 2 : 1;
+}
+
+function StoryMeta({
+  story,
+  tabs,
+  visit,
+}: {
+  story: ResolvedStory;
+  tabs: CachedBlob["tabs"];
+  visit: Visit;
+}) {
+  const primary = story.items[0];
+  const tier = tractionTier(primary, tabs);
+  const isNew = story.items.some((it) => visit.isNew(it.firstSeenDate));
+  return (
+    <span className="flex min-w-0 items-center gap-2 text-[10.5px] leading-none text-zinc-400 dark:text-zinc-500">
+      <span className="shrink-0 tracking-[-0.08em]">
+        <span className={TYPE_THEME[primary.type].text}>
+          {"▮".repeat(tier)}
+        </span>
+        <span className="opacity-25">{"▮".repeat(3 - tier)}</span>
+      </span>
+      <span className="truncate">{topSignalLabel(primary.signals)}</span>
+      {/* Every underlying item is tappable: article, weights, thread… */}
+      {story.items.map((it) => {
+        const st =
+          SOURCE_THEME[
+            primarySource([...new Set(it.signals.map((s) => s.source))])
+          ];
+        if (!st) return null;
+        return (
+          <a
+            key={it.id}
+            href={it.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => visit.markOpened(it.id)}
+            className={`shrink-0 rounded px-1 py-0.5 font-semibold ${st.chip}`}
+          >
+            {st.label}
+          </a>
+        );
+      })}
+      {isNew && (
+        <span className={`shrink-0 font-bold ${BRIEF_THEME.text}`}>● new</span>
+      )}
+      <span className="ml-auto" />
+      <BookmarkButton
+        saved={visit.isSaved(primary.id)}
+        onToggle={() => visit.toggleSaved(primary)}
+      />
+    </span>
+  );
+}
+
+function StoryBlock({
+  story,
+  index,
+  tabs,
+  visit,
+}: {
+  story: ResolvedStory;
+  index: number;
+  tabs: CachedBlob["tabs"];
+  visit: Visit;
+}) {
+  const primary = story.items[0];
+  const read = story.items.every((it) => visit.opened.has(it.id));
+  const lead = index === 0;
+  return (
+    <div
+      className={`card-in rounded-2xl border border-zinc-200 bg-white/90 dark:border-zinc-800 dark:bg-zinc-900/85 ${
+        lead ? "p-4" : "px-4 py-3"
+      } ${read ? "opacity-60" : ""}`}
+      style={{ animationDelay: `${index * 45}ms` }}
+    >
+      <div className="flex gap-2.5">
+        {!lead && (
+          <span
+            className={`pt-0.5 text-[13px] font-bold tabular-nums ${BRIEF_THEME.text}`}
+          >
+            {index + 1}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <a
+            href={primary.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => visit.markOpened(primary.id)}
+            className={`block font-bold leading-snug ${
+              lead ? "text-[17px]" : "text-[14px]"
+            }`}
+          >
+            {story.headline}
+          </a>
+          {story.why && (
+            <p
+              className={`mt-1 leading-snug text-zinc-600 dark:text-zinc-400 ${
+                lead ? "text-[13px]" : "text-[12px]"
+              }`}
+            >
+              {story.why}
+            </p>
+          )}
+          <div className="mt-2">
+            <StoryMeta story={story} tabs={tabs} visit={visit} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RadarRow({ item, visit }: { item: Item; visit: Visit }) {
+  const isNew = visit.isNew(item.firstSeenDate);
+  return (
+    <li
+      className={`flex items-center gap-2 px-1 py-1 ${
+        visit.opened.has(item.id) ? "opacity-55" : ""
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 shrink-0 rounded-full ${TYPE_THEME[item.type].bar}`}
+      />
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => visit.markOpened(item.id)}
+        className="min-w-0 flex-1 truncate text-[12.5px] font-medium"
+      >
+        {item.title}
+      </a>
+      {isNew && (
+        <span className={`shrink-0 text-[10px] font-bold ${BRIEF_THEME.text}`}>
+          ●
+        </span>
+      )}
+      <span className="shrink-0 text-[10px] text-zinc-400 dark:text-zinc-500">
+        {topSignalLabel(item.signals)}
+      </span>
+      <BookmarkButton
+        saved={visit.isSaved(item.id)}
+        onToggle={() => visit.toggleSaved(item)}
+      />
+    </li>
+  );
+}
+
+// ---------- Page ----------
+
 export default function Briefing({
   tabs,
   visit,
-  brief,
+  digest,
 }: {
   tabs: CachedBlob["tabs"];
   visit: Visit;
-  brief: { bullets: string[] } | null;
+  digest: { stories: DigestStory[] } | null;
 }) {
+  // Resolve digest ids against the cached items; a story survives as long
+  // as one id resolves. An unresolvable digest (stale cache) → tile mode.
+  const stories = useMemo<ResolvedStory[]>(() => {
+    if (!digest?.stories) return [];
+    const byId = new Map<string, Item>();
+    for (const tab of Object.values(tabs))
+      for (const it of tab?.items ?? []) byId.set(it.id, it);
+    return digest.stories
+      .map((s) => ({
+        ...s,
+        items: s.ids
+          .map((id) => byId.get(id))
+          .filter((it): it is Item => Boolean(it)),
+      }))
+      .filter((s) => s.items.length > 0);
+  }, [digest, tabs]);
+
+  const storyMode = stories.length >= 2;
+
+  // "Also on the radar": breadth below the stories, everything not already
+  // covered by them. Same picker as the tile fallback.
+  const radar = useMemo<SectionGroup[]>(() => {
+    if (!storyMode) return [];
+    const seen: string[] = stories.flatMap((s) => [
+      norm(s.headline),
+      ...s.items.map((it) => norm(it.title)),
+    ]);
+    const shown = new Set(stories.flatMap((s) => s.items.map((it) => it.id)));
+    return SECTIONS.map((s) => ({
+      ...s,
+      items: pick(
+        freshPool(tabs[s.type]?.items ?? [], RADAR_TAKE[s.type]),
+        RADAR_TAKE[s.type],
+        seen,
+        shown
+      ),
+    })).filter((s) => s.items.length > 0);
+  }, [storyMode, stories, tabs]);
+
+  // Tile fallback (also the empty-cache message).
   const { newGroups, trendingGroups } = useMemo(() => {
+    if (storyMode)
+      return { newGroups: [] as SectionGroup[], trendingGroups: [] as SectionGroup[] };
     const seen: string[] = [];
     const shown = new Set<string>();
-
-    // Everything new since the last visit, capped per type, shown first.
     const newGroups: SectionGroup[] = SECTIONS.map((s) => ({
       ...s,
       items: pick(
@@ -207,8 +426,6 @@ export default function Briefing({
         shown
       ),
     })).filter((s) => s.items.length > 0);
-
-    // The standing top-of-the-window picks, minus anything shown above.
     const trendingGroups: SectionGroup[] = SECTIONS.map((s) => ({
       ...s,
       items: pick(
@@ -218,44 +435,86 @@ export default function Briefing({
         shown
       ),
     })).filter((s) => s.items.length > 0);
-
     return { newGroups, trendingGroups };
-  }, [tabs, visit.isNew]);
+  }, [storyMode, tabs, visit.isNew]);
 
-  if (newGroups.length === 0 && trendingGroups.length === 0)
+  if (!storyMode && newGroups.length === 0 && trendingGroups.length === 0)
     return (
       <p className="py-10 text-center text-sm text-zinc-500">
         Nothing to brief yet — run the refresh endpoint once (see README).
       </p>
     );
 
-  const hasSplit = newGroups.length > 0;
+  const savedList = visit.saved.length > 0 && (
+    <>
+      <SectionHeader text="Saved for later" />
+      <ul className="col-span-2 space-y-1.5">
+        {visit.saved.map((s) => (
+          <li
+            key={s.id}
+            className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white/90 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/85"
+          >
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${TYPE_THEME[s.type].bar}`}
+            />
+            <a
+              href={s.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => visit.markOpened(s.id)}
+              className="min-w-0 flex-1 truncate text-[12.5px] font-medium"
+            >
+              {s.title}
+            </a>
+            <BookmarkButton saved onToggle={() => visit.toggleSaved(s)} />
+          </li>
+        ))}
+      </ul>
+    </>
+  );
 
+  if (storyMode)
+    return (
+      <div className="mt-1 grid grid-cols-2 gap-2">
+        <div
+          className={`col-span-2 px-1 pt-1 text-[10.5px] font-bold uppercase leading-none tracking-wide ${BRIEF_THEME.text}`}
+        >
+          Daily brief ·{" "}
+          {new Date().toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          })}
+        </div>
+        <div className="col-span-2 space-y-2">
+          {stories.map((s, i) => (
+            <StoryBlock
+              key={s.items[0].id}
+              story={s}
+              index={i}
+              tabs={tabs}
+              visit={visit}
+            />
+          ))}
+        </div>
+        {radar.length > 0 && (
+          <>
+            <SectionHeader text="Also on the radar" />
+            <ul className="col-span-2 space-y-0.5">
+              {radar.flatMap((g) =>
+                g.items.map((it) => (
+                  <RadarRow key={it.id} item={it} visit={visit} />
+                ))
+              )}
+            </ul>
+          </>
+        )}
+        {savedList}
+      </div>
+    );
+
+  const hasSplit = newGroups.length > 0;
   return (
     <div className="mt-1 grid grid-cols-2 gap-2">
-      {brief && brief.bullets.length > 0 && (
-        <div
-          className={`card-in col-span-2 rounded-xl border border-violet-200/70 bg-violet-500/[0.06] p-3 dark:border-violet-900/50`}
-        >
-          <div
-            className={`text-[10.5px] font-bold uppercase leading-none tracking-wide ${BRIEF_THEME.text}`}
-          >
-            Daily brief
-          </div>
-          <ul className="mt-2 space-y-1.5">
-            {brief.bullets.map((b, i) => (
-              <li
-                key={i}
-                className="flex gap-2 text-[12.5px] leading-snug text-zinc-700 dark:text-zinc-300"
-              >
-                <span className={`select-none ${BRIEF_THEME.text}`}>›</span>
-                {b}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {hasSplit && (
         <>
           <SectionHeader text="Since your last visit" accent />
@@ -274,34 +533,7 @@ export default function Briefing({
           <TileGrid groups={trendingGroups} visit={visit} />
         </>
       )}
-
-      {visit.saved.length > 0 && (
-        <>
-          <SectionHeader text="Saved for later" />
-          <ul className="col-span-2 space-y-1.5">
-            {visit.saved.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white/90 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/85"
-              >
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${TYPE_THEME[s.type].bar}`}
-                />
-                <a
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => visit.markOpened(s.id)}
-                  className="min-w-0 flex-1 truncate text-[12.5px] font-medium"
-                >
-                  {s.title}
-                </a>
-                <BookmarkButton saved onToggle={() => visit.toggleSaved(s)} />
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      {savedList}
     </div>
   );
 }

@@ -42,7 +42,15 @@ export interface CachedBlob {
   // Age (days) of the LLM leaderboard baseline the delta signals compare
   // against; absent until a second day of history exists.
   llmDeltaDays?: number;
-  // Gemini-written "what happened" bullets, generated once per refresh;
-  // absent when GEMINI_API_KEY is missing or the call failed.
-  brief?: { bullets: string[] };
+  // Gemini-edited ranked digest (lead story first), generated once per
+  // refresh; `ids` reference items in `tabs` so the client can attach
+  // links, chips, and traction. Absent when GEMINI_API_KEY is missing or
+  // the call failed — the Today tab then falls back to its tile grid.
+  digest?: { stories: DigestStory[] };
+}
+
+export interface DigestStory {
+  headline: string;
+  why: string; // one "so what" sentence
+  ids: string[]; // items this story is built from (first = primary link)
 }

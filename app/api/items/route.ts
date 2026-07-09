@@ -11,7 +11,7 @@ export async function GET() {
     generatedAt: blob?.generatedAt ?? null,
     tabs: blob?.tabs ?? {},
     llmDeltaDays: blob?.llmDeltaDays ?? null,
-    brief: blob?.brief ?? null,
+    digest: blob?.digest ?? null,
     config: Object.fromEntries(
       Object.entries(CONFIG).map(([k, v]) => [
         k,

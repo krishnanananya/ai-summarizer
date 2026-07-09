@@ -14,7 +14,7 @@ import {
   snapshotFromItems,
   updateHistory,
 } from "@/lib/llmHistory";
-import { backfillArticleSummaries, generateDailyBrief } from "@/lib/brief";
+import { backfillArticleSummaries, generateDigest } from "@/lib/brief";
 
 export const maxDuration = 60; // Hobby-tier max for cron-invoked functions
 export const dynamic = "force-dynamic";
@@ -57,19 +57,20 @@ async function runRefresh() {
     }
   }
 
-  // Gemini enrichment (daily brief + summaries for bare articles), in
-  // parallel and fail-soft: a quota error or timeout never blocks the cache.
-  const [briefRes, summaryRes] = await Promise.allSettled([
-    generateDailyBrief(blob),
+  // Gemini enrichment (ranked story digest + summaries for bare articles),
+  // in parallel and fail-soft: a quota error or timeout never blocks the
+  // cache — the Today tab just falls back to its tile grid.
+  const [digestRes, summaryRes] = await Promise.allSettled([
+    generateDigest(blob),
     backfillArticleSummaries(blob),
   ]);
-  if (briefRes.status === "fulfilled" && briefRes.value) {
-    blob.brief = { bullets: briefRes.value };
-    console.log(`[refresh] brief: ok (${briefRes.value.length} bullets)`);
+  if (digestRes.status === "fulfilled" && digestRes.value) {
+    blob.digest = { stories: digestRes.value };
+    console.log(`[refresh] digest: ok (${digestRes.value.length} stories)`);
   } else {
     console.log(
-      `[refresh] brief: skipped — ${
-        briefRes.status === "rejected" ? briefRes.reason : "no key or empty"
+      `[refresh] digest: skipped — ${
+        digestRes.status === "rejected" ? digestRes.reason : "no key or empty"
       }`
     );
   }
