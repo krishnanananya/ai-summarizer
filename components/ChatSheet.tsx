@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CHAT_THEME } from "./theme";
 
 interface Msg {
   role: "user" | "model";
@@ -62,11 +61,15 @@ function CatIcon({
   );
 }
 
-// Floating chat button + bottom sheet. Self-contained: mount once anywhere.
-// The sheet opens at half height, expands to full screen, and stays mounted
-// after first open so the conversation survives closing it.
-export default function ChatSheet() {
-  const [open, setOpen] = useState(false);
+// Bottom sheet, opened from the CHAT tab. Controlled by the parent; stays
+// mounted after first open so the conversation survives closing it.
+export default function ChatSheet({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -76,10 +79,9 @@ export default function ChatSheet() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const show = () => {
-    setMounted(true);
-    setOpen(true);
-  };
+  useEffect(() => {
+    if (open) setMounted(true);
+  }, [open]);
 
   // Lock the page behind the sheet while it's open.
   useEffect(() => {
@@ -130,161 +132,148 @@ export default function ChatSheet() {
     }
   }
 
+  if (!mounted) return null;
+
   return (
-    <>
-      {/* Floating chat button, above the tab bar */}
-      {!open && (
-        <button
-          onClick={show}
-          aria-label="Open Snap le Chat"
-          className={`fixed right-4 bottom-[calc(4.4rem+env(safe-area-inset-bottom))] z-20 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg shadow-fuchsia-500/30 transition-all active:scale-90 ${CHAT_THEME.bar}`}
-        >
-          <CatIcon animated className="h-7 w-7" />
-        </button>
-      )}
+    <div className={`fixed inset-0 z-30 ${open ? "" : "pointer-events-none"}`}>
+      {/* Backdrop — tap to close */}
+      <div
+        onClick={() => onOpenChange(false)}
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+      />
 
-      {mounted && (
+      {/* Sheet */}
+      <div
+        className={`absolute inset-x-0 bottom-0 mx-auto flex max-w-xl flex-col border-[var(--line)] bg-[var(--bg)] transition-all duration-300 ease-out ${
+          expanded
+            ? "h-[100dvh] rounded-none border-0"
+            : "h-[55dvh] rounded-t-3xl border border-b-0"
+        } ${open ? "translate-y-0" : "translate-y-full"}`}
+      >
+        {/* Header: handle + title + expand/close */}
         <div
-          className={`fixed inset-0 z-30 ${open ? "" : "pointer-events-none"}`}
+          className={`flex items-center gap-2 px-4 pb-2 ${
+            expanded ? "pt-[max(0.75rem,env(safe-area-inset-top))]" : "pt-2"
+          }`}
         >
-          {/* Backdrop — tap to close */}
-          <div
-            onClick={() => setOpen(false)}
-            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
-              open ? "opacity-100" : "opacity-0"
-            }`}
-          />
-
-          {/* Sheet */}
-          <div
-            className={`absolute inset-x-0 bottom-0 mx-auto flex max-w-xl flex-col border-zinc-200 bg-zinc-100 transition-all duration-300 ease-out dark:border-zinc-800 dark:bg-zinc-950 ${
-              expanded
-                ? "h-[100dvh] rounded-none border-0"
-                : "h-[55dvh] rounded-t-3xl border border-b-0"
-            } ${open ? "translate-y-0" : "translate-y-full"}`}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            aria-label={expanded ? "Collapse" : "Expand"}
+            className="absolute left-1/2 top-2 -translate-x-1/2 p-2"
           >
-            {/* Header: handle + title + expand/close */}
-            <div
-              className={`flex items-center gap-2 px-4 pb-2 ${
-                expanded ? "pt-[max(0.75rem,env(safe-area-inset-top))]" : "pt-2"
-              }`}
+            <span className="block h-1 w-10 rounded-full bg-[var(--line)]" />
+          </button>
+          <h2 className="mt-3 flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.16em] text-[var(--acc)]">
+            <CatIcon animated className="h-5 w-5" />
+            SNAP LE CHAT
+          </h2>
+          <div className="ml-auto mt-3 flex gap-1">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              aria-label={expanded ? "Collapse" : "Expand"}
+              className="rounded-lg p-1.5 text-[var(--mut)] active:text-[var(--text)]"
             >
-              <button
-                onClick={() => setExpanded(!expanded)}
-                aria-label={expanded ? "Collapse" : "Expand"}
-                className="absolute left-1/2 top-2 -translate-x-1/2 p-2"
-              >
-                <span className="block h-1 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-              </button>
-              <h2 className={`mt-3 flex items-center gap-1.5 text-sm font-bold ${CHAT_THEME.text}`}>
-                <CatIcon animated className="h-5 w-5" />
-                Snap le Chat
-              </h2>
-              <div className="ml-auto mt-3 flex gap-1">
-                <button
-                  onClick={() => setExpanded(!expanded)}
-                  aria-label={expanded ? "Collapse" : "Expand"}
-                  className="rounded-lg p-1.5 text-zinc-500 active:bg-zinc-200 dark:active:bg-zinc-800"
-                >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    {expanded ? (
-                      <path d="M4 14h6v6M20 10h-6V4" />
-                    ) : (
-                      <path d="M4 10V4h6M20 14v6h-6" />
-                    )}
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setOpen(false)}
-                  aria-label="Close chat"
-                  className="rounded-lg p-1.5 text-zinc-500 active:bg-zinc-200 dark:active:bg-zinc-800"
-                >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Messages */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3">
-              {messages.length === 0 && (
-                <div className="px-2 pt-6 text-center">
-                  <CatIcon className="mx-auto mb-3 h-10 w-10 text-zinc-300 dark:text-zinc-700" />
-                  <p className="text-sm text-zinc-500">
-                    Hi, I&apos;m Snap le Chat. Ask me about what&apos;s
-                    trending in AI — papers, models, leaderboard moves, news.
-                  </p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {SUGGESTIONS.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => send(s)}
-                        className={`rounded-xl px-3 py-2 text-[12.5px] font-medium ${CHAT_THEME.softBg} ${CHAT_THEME.text} transition-all active:scale-95`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <ul className="space-y-2.5 py-2">
-                {messages.map((m, i) => (
-                  <li
-                    key={i}
-                    className={m.role === "user" ? "flex justify-end" : "flex"}
-                  >
-                    <div
-                      className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed ${
-                        m.role === "user"
-                          ? `${CHAT_THEME.softBg} ${CHAT_THEME.text}`
-                          : "border border-zinc-200 bg-white text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
-                      }`}
-                    >
-                      {m.text ||
-                        (busy && i === messages.length - 1 ? (
-                          <span className="inline-flex gap-1">
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:120ms]" />
-                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:240ms]" />
-                          </span>
-                        ) : null)}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              {error && (
-                <p className="pb-2 text-center text-xs text-red-500">{error}</p>
-              )}
-            </div>
-
-            {/* Input */}
-            <form
-              className="flex gap-2 border-t border-zinc-200 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-zinc-800"
-              onSubmit={(e) => {
-                e.preventDefault();
-                send(input);
-              }}
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {expanded ? (
+                  <path d="M4 14h6v6M20 10h-6V4" />
+                ) : (
+                  <path d="M4 10V4h6M20 14v6h-6" />
+                )}
+              </svg>
+            </button>
+            <button
+              onClick={() => onOpenChange(false)}
+              aria-label="Close chat"
+              className="rounded-lg p-1.5 text-[var(--mut)] active:text-[var(--text)]"
             >
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask Snap…"
-                enterKeyHint="send"
-                className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:placeholder:text-zinc-600 dark:focus:border-zinc-600"
-              />
-              <button
-                type="submit"
-                disabled={busy || !input.trim()}
-                className={`rounded-xl px-3.5 py-2 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-40 ${CHAT_THEME.bar}`}
-              >
-                ↑
-              </button>
-            </form>
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
-      )}
-    </>
+
+        {/* Messages */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3">
+          {messages.length === 0 && (
+            <div className="px-2 pt-6 text-center">
+              <CatIcon className="mx-auto mb-3 h-10 w-10 text-[var(--mut)] opacity-50" />
+              <p className="text-sm text-[var(--mut)]">
+                Hi, I&apos;m Snap le Chat. Ask me about what&apos;s trending in
+                AI — papers, models, leaderboard moves, news.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s)}
+                    className="rounded-xl border border-[var(--line)] px-3 py-2 text-[12.5px] font-medium text-[var(--text)] transition-all active:scale-95"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <ul className="space-y-2.5 py-2">
+            {messages.map((m, i) => (
+              <li
+                key={i}
+                className={m.role === "user" ? "flex justify-end" : "flex"}
+              >
+                <div
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed ${
+                    m.role === "user"
+                      ? "bg-[var(--acc-dim)] text-[var(--text)]"
+                      : "border border-[var(--line)] bg-[var(--panel)] text-[var(--text)]"
+                  }`}
+                >
+                  {m.text ||
+                    (busy && i === messages.length - 1 ? (
+                      <span className="inline-flex gap-1">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--mut)]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--mut)] [animation-delay:120ms]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--mut)] [animation-delay:240ms]" />
+                      </span>
+                    ) : null)}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {error && (
+            <p className="pb-2 text-center text-xs text-[var(--alert)]">
+              {error}
+            </p>
+          )}
+        </div>
+
+        {/* Input */}
+        <form
+          className="flex gap-2 border-t border-[var(--line)] px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(input);
+          }}
+        >
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask Snap…"
+            enterKeyHint="send"
+            className="min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-sm outline-none placeholder:text-[var(--mut)] focus:border-[var(--acc)]"
+          />
+          <button
+            type="submit"
+            disabled={busy || !input.trim()}
+            className="rounded-xl border border-[var(--acc)] px-3.5 py-2 font-mono text-sm font-bold text-[var(--acc)] transition-all active:scale-95 disabled:opacity-40"
+          >
+            ↑
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

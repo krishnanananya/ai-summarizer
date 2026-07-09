@@ -31,6 +31,16 @@ Per-tab: search, time-window filter, sort modes (Top / New / Discussed / Weeks),
 - **Manual refresh button** (header, added 2026-07-09): POST `/api/refresh` needs no secret — debounced server-side (no-op under 30-min blob age, returns `fresh`) plus a Redis NX / module-state lock against concurrent runs; the cron GET keeps its `CRON_SECRET`. Spinner runs for the ~20–40s pipeline, then the client re-pulls `/api/items`.
 - **Saved for later**: bookmark toggle on cards and tiles stores snapshots (`{id,type,title,url,savedAt}`, cap 100) in localStorage so links outlive feed windows; listed with remove buttons at the bottom of Today.
 
+### "Signals desk" visual identity (2026-07-09 redesign)
+
+- **Tokens** (`app/globals.css` CSS vars, Tailwind 4 `@custom-variant dark`): dark = ink `#0A0E17` + phosphor green `#3FE88C`; light = paper `#F4F2EC` + print amber `#A96A00`; red (`--alert`) is reserved for failures. Per-type color survives only as 6px lane dots.
+- **Type**: Newsreader (headlines + italic "why" voice) and IBM Plex Mono (all instrumentation: masthead, meters, kickers, chips), self-hosted via `next/font`.
+- **Signature**: 7-segment phosphor traction meter (`Meter` in `ItemCard.tsx`); masthead is a mono instrument line (live blip + `SYNC 12M` + `N NEW` + `✓ CAUGHT UP`).
+- **Navigation: four modes** — TODAY / FEEDS / SAVED / CHAT bottom bar. Content lanes (PAPERS / MODELS / LLMS / NEWS / TALK) live inside Feeds as an underline strip; swipe still switches lanes. Chat's floating cat button retired — CHAT tab opens the sheet. `SavedList.tsx` is the reading-list mode (ALL/PAPERS/ARTICLES).
+- **Theme toggle**: ⋯ menu in the masthead (`ThemeMenu.tsx`) — Auto/Light/Dark, `radar:theme` in localStorage, applied pre-paint by an inline script in `layout.tsx`; auto tracks the OS live.
+- **GalaxyBackground deleted** → `RadarRings.tsx` (three CSS hairline rings behind the masthead).
+- Design mockups: claude.ai artifact "AI Radar — design proposal" (rev 2, phone frames for Today/Feeds/Saved).
+
 ### Snap le Chat (chatbot)
 
 - **UI**: floating cat-icon button (bottom-right) opens a bottom sheet at ~55% screen height, expandable to full screen; backdrop tap or × closes; conversation persists across open/close. Mascot is an inline-SVG line-drawn cat ("chat" = French for cat) with CSS-animated tail swish and blinking eyes.

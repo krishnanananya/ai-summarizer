@@ -3,31 +3,31 @@
 import { useState } from "react";
 import type { Item, Signal } from "@/lib/types";
 import { sentenceClamp } from "@/lib/http";
-import { SOURCE_THEME, TYPE_THEME, primarySource } from "./theme";
+import { SOURCE_LABEL } from "./theme";
 
 const METRIC_LABELS: Record<string, string> = {
-  "hf:upvotes": "HF upvotes",
-  "hf:comments": "HF comments",
-  "hf:likes": "HF likes",
-  "hf:downloads": "HF downloads",
-  "hn:points": "HN points",
-  "hn:comments": "HN comments",
-  "github:stars": "GitHub stars",
-  "reddit:score": "Reddit upvotes",
-  "reddit:comments": "Reddit comments",
+  "hf:upvotes": "HF UPVOTES",
+  "hf:comments": "HF COMMENTS",
+  "hf:likes": "HF LIKES",
+  "hf:downloads": "HF DL",
+  "hn:points": "HN PTS",
+  "hn:comments": "HN COMMENTS",
+  "github:stars": "GH STARS",
+  "reddit:score": "REDDIT UPVOTES",
+  "reddit:comments": "REDDIT COMMENTS",
 };
 
-// The single loudest signal, e.g. "362 HN points" — used by the compact
-// briefing tiles where the full breakdown doesn't fit.
+// The single loudest signal, e.g. "362 HN PTS" — the compact readout used
+// where the full breakdown doesn't fit.
 export function topSignalLabel(signals: Signal[]): string {
   const top = signals
     .filter((s) => s.value > 0 && `${s.source}:${s.metric}` !== "rss:official")
     .sort((a, b) => b.value - a.value)[0];
   if (!top)
-    return signals.some((s) => s.source === "rss") ? "official blog" : "";
+    return signals.some((s) => s.source === "rss") ? "OFFICIAL BLOG" : "";
   return `${fmtCount(top.value)} ${
     METRIC_LABELS[`${top.source}:${top.metric}`] ??
-    `${top.source} ${top.metric}`
+    `${top.source} ${top.metric}`.toUpperCase()
   }`;
 }
 
@@ -38,16 +38,33 @@ function whyBreakdown(signals: Signal[], expanded: boolean): string {
     .slice(0, expanded ? 10 : 2)
     .map(
       (s) =>
-        `${fmtCount(s.value)} ${METRIC_LABELS[`${s.source}:${s.metric}`] ?? `${s.source} ${s.metric}`}`
+        `${fmtCount(s.value)} ${METRIC_LABELS[`${s.source}:${s.metric}`] ?? `${s.source} ${s.metric}`.toUpperCase()}`
     );
-  if (signals.some((s) => s.source === "rss")) parts.push("official blog");
+  if (signals.some((s) => s.source === "rss")) parts.push("OFFICIAL BLOG");
   const sources = new Set(signals.map((s) => s.source)).size;
-  if (sources > 1) parts.push(`${sources} sources`);
+  if (sources > 1) parts.push(`${sources} SOURCES`);
   return parts.join(" · ");
 }
 
-// Tap target for "save for later" — used on cards and briefing tiles. Stops
-// propagation so it never expands the card or follows the tile link.
+// The signature mark: a 7-segment phosphor meter of relative traction.
+export function Meter({ ratio }: { ratio: number }) {
+  const filled = Math.max(1, Math.min(7, Math.round(ratio * 7)));
+  return (
+    <span className="inline-flex shrink-0 items-center gap-[2.5px]">
+      {Array.from({ length: 7 }, (_, i) => (
+        <i
+          key={i}
+          className={`h-[9px] w-[4px] rounded-[1px] ${
+            i < filled ? "bg-[var(--acc)]" : "bg-[var(--line)]"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
+// Tap target for "save for later" — used on cards, stories, and radar rows.
+// Stops propagation so it never expands the card or follows the row link.
 export function BookmarkButton({
   saved,
   onToggle,
@@ -66,9 +83,7 @@ export function BookmarkButton({
         onToggle();
       }}
       className={`-m-1.5 shrink-0 p-1.5 transition-colors ${
-        saved
-          ? "text-violet-500"
-          : "text-zinc-300 active:text-zinc-500 dark:text-zinc-700 dark:active:text-zinc-500"
+        saved ? "text-[var(--acc)]" : "text-[var(--mut)] opacity-60"
       } ${className}`}
     >
       <svg
@@ -104,20 +119,21 @@ export default function ItemCard({
   isSaved?: boolean;
   onToggleSave?: (item: Item) => void;
 }) {
-  // Stagger only the first screenful; later cards appear instantly on scroll.
-  const delay = index < 12 ? `${index * 45}ms` : "0ms";
+  // Stagger only the first screenful; later rows appear instantly on scroll.
+  const delay = index < 12 ? `${index * 40}ms` : "0ms";
   const [expanded, setExpanded] = useState(false);
-  const theme = TYPE_THEME[item.type];
-  const src = primarySource([...new Set(item.signals.map((s) => s.source))]);
-  const srcTheme = SOURCE_THEME[src];
+  const src = SOURCE_LABEL[
+    // strongest source string for the meta line
+    [...new Set(item.signals.map((s) => s.source))][0] ?? ""
+  ];
   // Papers: the author list is preview noise — expanded-only.
   const metaLine = item.type === "paper" ? null : item.authorsOrSource;
   const summary = expanded ? item.summary : sentenceClamp(item.summary, 220);
 
   return (
     <li
-      className={`card-in rounded-2xl border border-zinc-200 bg-white/90 p-4 shadow-sm transition-[background-color,transform,opacity] active:scale-[0.99] active:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/85 dark:active:bg-zinc-800/70 ${
-        isRead && !expanded ? "opacity-60" : ""
+      className={`card-in border-b border-[var(--line)] px-1 py-3.5 transition-opacity ${
+        isRead && !expanded ? "opacity-55" : ""
       }`}
       style={{ animationDelay: delay }}
       onClick={() => {
@@ -125,23 +141,10 @@ export default function ItemCard({
         if (!expanded) onOpen?.(item.id); // reading the details counts as read
       }}
     >
-      <div className="flex items-center gap-2 text-[11px]">
-        {srcTheme && (
-          <span
-            className={`rounded-md px-1.5 py-0.5 font-semibold ${srcTheme.chip}`}
-          >
-            {srcTheme.label}
-          </span>
-        )}
-        {metaLine && (
-          <span className="truncate text-zinc-500">{metaLine}</span>
-        )}
-        <span className="ml-auto shrink-0 text-zinc-400 dark:text-zinc-500">
-          {isNew && (
-            <span className={`mr-1.5 font-bold ${theme.text}`}>new</span>
-          )}
-          {relDate(item.firstSeenDate)}
-        </span>
+      <div className="flex items-center gap-2 font-mono text-[9.5px] tracking-[0.12em] text-[var(--mut)]">
+        {isNew && <span className="font-bold text-[var(--acc)]">● NEW</span>}
+        {metaLine && <span className="truncate normal-case">{metaLine}</span>}
+        <span className="ml-auto shrink-0">{relDate(item.firstSeenDate)}</span>
         {onToggleSave && (
           <BookmarkButton
             saved={isSaved}
@@ -150,46 +153,32 @@ export default function ItemCard({
         )}
       </div>
 
-      <h2 className="mt-1.5 text-[15px] font-semibold leading-snug">
+      <h2 className="mt-1.5 font-serif text-[16px] font-bold leading-snug">
         {item.title}
       </h2>
 
       {summary && (
-        <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--mut)]">
           {summary}
         </p>
       )}
 
       {expanded && item.type === "paper" && item.authorsOrSource && (
-        <p className="expand-in mt-2 text-xs text-zinc-500">
+        <p className="expand-in mt-2 text-xs text-[var(--mut)]">
           {clampAuthors(item.authorsOrSource)}
         </p>
       )}
 
-      <div className="mt-3 flex items-center gap-2">
-        <div className="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-          <div
-            className={`bar-grow h-full rounded-full ${theme.bar}`}
-            style={{
-              width: `${Math.max(6, (item.tractionScore / (maxScore || 1)) * 100)}%`,
-              animationDelay: delay,
-            }}
-          />
-        </div>
-        <span className="truncate text-[11px] text-zinc-500">
-          {whyBreakdown(item.signals, expanded)}
-        </span>
+      <div className="mt-2.5 flex items-center gap-2.5 font-mono text-[9.5px] tracking-[0.1em] text-[var(--mut)]">
+        <Meter ratio={item.tractionScore / (maxScore || 1)} />
+        <span className="truncate">{whyBreakdown(item.signals, expanded)}</span>
+        {src && !onToggleSave && <span className="ml-auto">{src}</span>}
       </div>
 
-      {(item.tags.length > 0 || expanded) && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+      {expanded && item.tags.length > 0 && (
+        <div className="expand-in mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[9px] tracking-[0.14em] text-[var(--mut)]">
           {item.tags.map((t) => (
-            <span
-              key={t}
-              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${theme.softBg} ${theme.text}`}
-            >
-              {t}
-            </span>
+            <span key={t}>#{t.toUpperCase()}</span>
           ))}
         </div>
       )}
@@ -203,9 +192,9 @@ export default function ItemCard({
             e.stopPropagation();
             onOpen?.(item.id);
           }}
-          className={`expand-in mt-3 block w-full rounded-xl py-2.5 text-center text-sm font-semibold text-white transition-transform active:scale-[0.98] ${theme.bar}`}
+          className="expand-in mt-3 block w-full rounded-xl border border-[var(--acc)] py-2.5 text-center font-mono text-[11px] font-bold tracking-[0.14em] text-[var(--acc)] transition-transform active:scale-[0.98]"
         >
-          Open {srcTheme ? `on ${hostLabel(item.url)}` : ""}
+          OPEN ON {hostLabel(item.url).toUpperCase()} →
         </a>
       )}
     </li>
@@ -214,7 +203,7 @@ export default function ItemCard({
 
 function fmtCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${Math.round(n / 1000)}k`;
+  if (n >= 10_000) return `${Math.round(n / 1000)}K`;
   return String(n);
 }
 
@@ -226,9 +215,9 @@ function clampAuthors(s: string): string {
 
 export function relDate(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400_000);
-  if (days <= 0) return "today";
-  if (days === 1) return "1d";
-  return `${days}d`;
+  if (days <= 0) return "TODAY";
+  if (days === 1) return "1D";
+  return `${days}D`;
 }
 
 function hostLabel(url: string): string {

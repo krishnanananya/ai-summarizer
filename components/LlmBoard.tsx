@@ -2,7 +2,6 @@
 
 import { Fragment, useMemo, useState } from "react";
 import type { Item } from "@/lib/types";
-import { TYPE_THEME } from "./theme";
 
 // Coinglass-style matrix for the LLMs tab: one row per model, one column per
 // arena board, sortable by clicking a column header. Items arrive one per
@@ -17,9 +16,14 @@ const BOARDS = [
   { key: "search", label: "Search" },
 ];
 
-const MEDALS = ["text-amber-500", "text-zinc-400", "text-amber-700"];
-const UP = "text-emerald-600 dark:text-emerald-400";
-const DOWN = "text-rose-600 dark:text-rose-400";
+// Podium ranks glow in the accent; movement up is accent, down is alert.
+const MEDALS = [
+  "text-[var(--acc)]",
+  "text-[var(--text)] opacity-70",
+  "text-[var(--acc)] opacity-60",
+];
+const UP = "text-[var(--acc)]";
+const DOWN = "text-[var(--alert)]";
 
 function boardValue(it: Item): number {
   return (
@@ -112,7 +116,6 @@ export default function LlmBoard({
 }) {
   const [sortKey, setSortKey] = useState("text");
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const theme = TYPE_THEME.llm;
 
   const { rows: modelRows, sizes } = useMemo(() => buildRows(allItems), [allItems]);
 
@@ -146,18 +149,18 @@ export default function LlmBoard({
   return (
     <div className="mt-2">
       {rows.length === 0 && (
-        <p className="py-10 text-center text-sm text-zinc-500">
+        <p className="py-10 text-center text-sm text-[var(--mut)]">
           Nothing matches.
         </p>
       )}
 
       {rows.length > 0 && (
-        <div className="card-in overflow-hidden rounded-2xl border border-zinc-200 bg-white/90 dark:border-zinc-800 dark:bg-zinc-900/85">
+        <div className="card-in overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
-                <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                  <th className="sticky left-0 z-10 bg-white/95 py-2 pl-3.5 pr-2 text-[11px] font-semibold text-zinc-400 backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-600">
+                <tr className="border-b border-[var(--line)]">
+                  <th className="sticky left-0 z-10 bg-[var(--panel)] py-2 pl-3.5 pr-2 font-mono text-[9.5px] tracking-[0.14em] text-[var(--mut)]">
                     Model
                   </th>
                   {boards.map((b) => {
@@ -166,10 +169,10 @@ export default function LlmBoard({
                       <th key={b.key} className="px-1 py-1">
                         <button
                           onClick={() => setSortKey(b.key)}
-                          className={`w-full rounded-lg px-2 py-1 text-right text-[11px] font-semibold transition-colors ${
+                          className={`w-full rounded-lg px-2 py-1 text-right font-mono text-[9.5px] tracking-[0.1em] transition-colors ${
                             on
-                              ? `${theme.softBg} ${theme.text}`
-                              : "text-zinc-400 dark:text-zinc-600"
+                              ? "font-bold text-[var(--acc)]"
+                              : "text-[var(--mut)]"
                           }`}
                         >
                           {b.label}
@@ -180,7 +183,7 @@ export default function LlmBoard({
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/70">
+              <tbody className="divide-y divide-[var(--line)]">
                 {rows.map((r) => {
                   const rank = r.ranks.get(activeSort);
                   const expanded = expandedKey === r.key;
@@ -193,16 +196,16 @@ export default function LlmBoard({
                         onClick={() =>
                           setExpandedKey(expanded ? null : r.key)
                         }
-                        className="cursor-pointer transition-colors active:bg-zinc-100 dark:active:bg-zinc-800/60"
+                        className="cursor-pointer transition-colors active:bg-[var(--acc-dim)]"
                       >
-                        <td className="sticky left-0 z-10 max-w-[46vw] bg-white/95 py-2 pl-3.5 pr-2 backdrop-blur dark:bg-zinc-900/95">
+                        <td className="sticky left-0 z-10 max-w-[46vw] bg-[var(--panel)] py-2 pl-3.5 pr-2">
                           <span className="flex items-baseline gap-2">
                             <span
                               className={`w-5 shrink-0 text-right text-[12px] font-bold tabular-nums ${
                                 rank != null
                                   ? MEDALS[rank - 1] ??
-                                    "text-zinc-400 dark:text-zinc-600"
-                                  : "text-zinc-300 dark:text-zinc-700"
+                                    "text-[var(--mut)]"
+                                  : "text-[var(--mut)] opacity-50"
                               }`}
                             >
                               {rank ?? "·"}
@@ -211,7 +214,7 @@ export default function LlmBoard({
                               <span className="block truncate text-[13px] font-semibold leading-tight">
                                 {r.title}
                               </span>
-                              <span className="block truncate text-[10.5px] text-zinc-500">
+                              <span className="block truncate text-[10.5px] text-[var(--mut)]">
                                 {r.debuts.has(activeSort) && (
                                   <span className={`mr-1 font-bold ${UP}`}>
                                     new
@@ -238,10 +241,10 @@ export default function LlmBoard({
                               key={b.key}
                               className={`px-3 py-2 text-right text-[13px] tabular-nums ${
                                 v == null
-                                  ? "text-zinc-300 dark:text-zinc-700"
+                                  ? "text-[var(--mut)] opacity-40"
                                   : on
-                                    ? `font-bold ${theme.text}`
-                                    : "text-zinc-600 dark:text-zinc-300"
+                                    ? "font-bold text-[var(--acc)]"
+                                    : "text-[var(--text)] opacity-80"
                               }`}
                             >
                               {v ?? "—"}
@@ -267,10 +270,10 @@ export default function LlmBoard({
                         <tr>
                           <td
                             colSpan={boards.length + 1}
-                            className="expand-in bg-zinc-50/60 px-3.5 py-3 dark:bg-zinc-950/40"
+                            className="expand-in bg-[var(--acc-dim)] px-3.5 py-3"
                           >
                             {r.summary && (
-                              <p className="text-[12px] leading-relaxed text-zinc-500">
+                              <p className="text-[12px] leading-relaxed text-[var(--mut)]">
                                 {r.summary}
                               </p>
                             )}
@@ -279,7 +282,7 @@ export default function LlmBoard({
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className={`mt-2 inline-block rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white ${theme.bar}`}
+                              className="mt-2 inline-block rounded-lg border border-[var(--acc)] px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.12em] text-[var(--acc)]"
                             >
                               Open →
                             </a>
@@ -292,7 +295,7 @@ export default function LlmBoard({
               </tbody>
             </table>
           </div>
-          <p className="border-t border-zinc-200/70 px-3.5 py-2 text-right text-[10.5px] text-zinc-400 dark:border-zinc-800/70 dark:text-zinc-600">
+          <p className="border-t border-[var(--line)] px-3.5 py-2 text-right font-mono text-[9px] tracking-[0.08em] text-[var(--mut)]">
             LMArena · Elo (Agent: win score)
             {deltaDays ? ` · Δ vs ${deltaDays}d ago` : ""} · tap a column to
             sort

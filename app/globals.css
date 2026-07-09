@@ -1,28 +1,78 @@
 @import "tailwindcss";
 
+/* Manual theme: the ⋯ menu toggles .dark on <html>; "auto" follows the OS.
+   All dark: utilities key off the class, not the media query. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-serif: var(--font-newsreader), "Iowan Old Style", "Palatino Linotype",
+    Palatino, Georgia, serif;
+  --font-mono: var(--font-plex), ui-monospace, "SF Mono", SFMono-Regular,
+    Menlo, Consolas, monospace;
+}
+
+/* "The signals desk" tokens — paper/print-amber in daylight,
+   ink/phosphor-green after dark. Red is reserved for real failures. */
+:root {
+  --bg: #f4f2ec;
+  --panel: #fdfcf9;
+  --line: #e0dcd0;
+  --text: #191c24;
+  --mut: #6d7484;
+  --acc: #a96a00;
+  --acc-dim: rgba(169, 106, 0, 0.1);
+  --alert: #c73b4d;
+}
+.dark {
+  --bg: #0a0e17;
+  --panel: #101624;
+  --line: #1c2436;
+  --text: #e9ecf4;
+  --mut: #7e89a3;
+  --acc: #3fe88c;
+  --acc-dim: rgba(63, 232, 140, 0.13);
+  --alert: #ff6478;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   overscroll-behavior-y: contain;
+  background: var(--bg);
+  color: var(--text);
 }
 
-/* Motion: staggered card entrances, growing traction bars, expand reveal */
-@keyframes card-in {
-  from { opacity: 0; transform: translateY(14px) scale(0.98); }
-  to { opacity: 1; transform: none; }
+/* Lane dots: the only place per-type color survives (6px marks). */
+.lane-paper { background: #4f5fd6; }
+.lane-model { background: #14809c; }
+.lane-llm { background: #14809c; }
+.lane-article { background: #a67c1b; }
+.lane-discussion { background: #d14a67; }
+.dark .lane-paper { background: #93a0ff; }
+.dark .lane-model { background: #56cfe4; }
+.dark .lane-llm { background: #56cfe4; }
+.dark .lane-article { background: #e3c069; }
+.dark .lane-discussion { background: #ff7e96; }
+
+/* Live blip in the masthead */
+@keyframes ping-ring {
+  0% { transform: scale(0.4); opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
 }
-@keyframes bar-grow {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+.blip-ring { animation: ping-ring 2.2s ease-out infinite; }
+
+/* Motion: staggered row entrances + expand reveal */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes expand-in {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: none; }
 }
-.card-in { animation: card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.bar-grow { transform-origin: left; animation: bar-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.card-in { animation: card-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .expand-in { animation: expand-in 0.25s ease-out both; }
 
 .no-scrollbar { scrollbar-width: none; }
@@ -49,5 +99,5 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card-in, .bar-grow, .expand-in, .cat-tail, .cat-eyes { animation: none; }
+  .card-in, .expand-in, .cat-tail, .cat-eyes, .blip-ring { animation: none; }
 }
