@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { Visit } from "@/lib/visit";
-import { BookmarkButton } from "./ItemCard";
+import type { SavedItem, Visit } from "@/lib/visit";
+import { BookmarkButton, NoteButton } from "./ItemCard";
 import { LANE_DOT } from "./theme";
 
 // The Saved mode: bookmarked items as a reading list, newest first.
@@ -27,7 +27,13 @@ function savedDate(ms: number): string {
     .toUpperCase()}`;
 }
 
-export default function SavedList({ visit }: { visit: Visit }) {
+export default function SavedList({
+  visit,
+  onNote,
+}: {
+  visit: Visit;
+  onNote: (item: SavedItem) => void;
+}) {
   const [filter, setFilter] = useState<Filter>("all");
 
   const items = visit.saved.filter((s) =>
@@ -87,6 +93,10 @@ export default function SavedList({ visit }: { visit: Visit }) {
                   {savedDate(s.savedAt)} · {s.type.toUpperCase()}
                 </span>
                 <span className="ml-auto" />
+                <NoteButton
+                  hasNote={!!visit.notes[s.id]}
+                  onClick={() => onNote(s)}
+                />
                 <BookmarkButton saved onToggle={() => visit.toggleSaved(s)} />
               </div>
               <a
@@ -98,6 +108,11 @@ export default function SavedList({ visit }: { visit: Visit }) {
               >
                 {s.title}
               </a>
+              {visit.notes[s.id] && (
+                <p className="mt-1.5 border-l-2 border-[var(--acc)] pl-2.5 font-serif text-[12.5px] italic leading-relaxed">
+                  {visit.notes[s.id].text}
+                </p>
+              )}
             </li>
           ))}
         </ul>

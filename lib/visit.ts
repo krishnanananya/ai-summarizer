@@ -16,8 +16,10 @@ const K_LAST_ACTIVE = "radar:lastActiveAt";
 const K_BOUNDARY = "radar:visitBoundary";
 const K_OPENED = "radar:openedIds";
 const K_SAVED = "radar:savedItems";
+const K_NOTES = "radar:itemNotes";
 const OPENED_CAP = 600; // oldest ids fall off; feeds only hold ~150/tab
 const SAVED_CAP = 100;
+const NOTES_CAP = 300; // least-recently-edited notes fall off
 
 // Read-later entries are snapshots, not ids: feed items age out of their
 // windows, and a saved link must outlive the feed that surfaced it.
@@ -27,6 +29,13 @@ export interface SavedItem {
   title: string;
   url: string;
   savedAt: number;
+}
+
+// Personal annotations, keyed by item id. Kept separate from the saved list
+// so a note survives an unsave/resave cycle.
+export interface ItemNote {
+  text: string;
+  updatedAt: number;
 }
 
 export interface Visit {
@@ -40,12 +49,19 @@ export interface Visit {
   saved: SavedItem[];
   isSaved: (id: string) => boolean;
   toggleSaved: (item: Pick<Item, "id" | "type" | "title" | "url">) => void;
+  notes: Record<string, ItemNote>;
+  /** Empty text deletes the note. Noting an unsaved item also saves it. */
+  setNote: (
+    item: Pick<Item, "id" | "type" | "title" | "url">,
+    text: string
+  ) => void;
 }
 
 export function useVisit(): Visit {
   const [boundary, setBoundary] = useState<number | null>(null);
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<SavedItem[]>([]);
+  const [notes, setNotes] = useState<Record<string, ItemNote>>({});
 
   useEffect(() => {
     try {
@@ -63,6 +79,8 @@ export function useVisit(): Visit {
       if (raw) setOpened(new Set(JSON.parse(raw) as string[]));
       const rawSaved = localStorage.getItem(K_SAVED);
       if (rawSaved) setSaved(JSON.parse(rawSaved) as SavedItem[]);
+      const rawNotes = localStorage.getItem(K_NOTES);
+      if (rawNotes) setNotes(JSON.parse(rawNotes) as Record<string, ItemNote>);
 
       // Keep "last active" fresh while the tab stays open, so stepping away
       // for a day and coming back counts as a fresh visit.
@@ -137,6 +155,51 @@ export function useVisit(): Visit {
     [saved]
   );
 
+  const setNote = useCallback(
+    (item: Pick<Item, "id" | "type" | "title" | "url">, text: string) => {
+      const t = text.trim();
+      setNotes((prev) => {
+        const next = { ...prev };
+        if (t) next[item.id] = { text: t, updatedAt: Date.now() };
+        else delete next[item.id];
+        try {
+          const kept = Object.fromEntries(
+            Object.entries(next)
+              .sort((a, b) => b[1].updatedAt - a[1].updatedAt)
+              .slice(0, NOTES_CAP)
+          );
+          localStorage.setItem(K_NOTES, JSON.stringify(kept));
+        } catch {
+          /* ignore quota/private-mode errors */
+        }
+        return next;
+      });
+      // A note must stay reachable after the item ages out of its feed
+      // window, so annotating an unsaved item bookmarks it too.
+      if (t)
+        setSaved((prev) => {
+          if (prev.some((s) => s.id === item.id)) return prev;
+          const next = [
+            {
+              id: item.id,
+              type: item.type,
+              title: item.title,
+              url: item.url,
+              savedAt: Date.now(),
+            },
+            ...prev,
+          ].slice(0, SAVED_CAP);
+          try {
+            localStorage.setItem(K_SAVED, JSON.stringify(next));
+          } catch {
+            /* ignore quota/private-mode errors */
+          }
+          return next;
+        });
+    },
+    []
+  );
+
   const isNew = useCallback(
     (firstSeenIso: string) =>
       boundary != null && new Date(firstSeenIso).getTime() > boundary,
@@ -152,5 +215,7 @@ export function useVisit(): Visit {
     saved,
     isSaved,
     toggleSaved,
+    notes,
+    setNote,
   };
 }

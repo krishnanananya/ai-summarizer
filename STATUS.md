@@ -30,6 +30,7 @@ Per-tab: search, time-window filter, sort modes (Top / New / Discussed / Weeks),
 - **✓ Caught up** button (header, shown when anything is new) advances the visit boundary to now — clears all badges without waiting out the 30-min session gap.
 - **Manual refresh button** (header, added 2026-07-09): POST `/api/refresh` needs no secret — debounced server-side (no-op under 30-min blob age, returns `fresh`) plus a Redis NX / module-state lock against concurrent runs; the cron GET keeps its `CRON_SECRET`. Spinner runs for the ~20–40s pipeline, then the client re-pulls `/api/items`.
 - **Saved for later**: bookmark toggle on cards and tiles stores snapshots (`{id,type,title,url,savedAt}`, cap 100) in localStorage so links outlive feed windows; listed with remove buttons at the bottom of Today.
+- **Notes on items** (added 2026-07-09): pencil button next to the bookmark on feed cards and Saved rows opens a bottom sheet (`NoteSheet.tsx`) with a textarea; notes render as an accent-bordered italic serif block under the summary/title. Stored in localStorage `radar:itemNotes` (`{text,updatedAt}` keyed by item id, cap 300 by recency, `lib/visit.ts`), separate from the saved list so a note survives unsave/resave; **noting an unsaved item auto-bookmarks it** so the note stays reachable after the item ages out of its feed window. Not on Briefing story tiles (kept uncluttered) — save from Today first, then annotate in Feeds or Saved.
 
 ### "Signals desk" visual identity (2026-07-09 redesign)
 
@@ -85,7 +86,7 @@ Per-tab: search, time-window filter, sort modes (Top / New / Discussed / Weeks),
 
 ## Verified working (local)
 
-- Production build + typecheck clean (re-verified 2026-07-07 after the catch-up-loop changes).
+- Production build + typecheck clean (re-verified 2026-07-09 after the item-notes feature).
 - `/api/refresh` populates all enabled tabs (HF, HN, GitHub, arena OK; Reddit fails without creds); with the real Gemini key it produced a 6-bullet brief and filled 40 article summaries; `/api/items` reported Discussion `enabled: false` while empty.
 - `/api/chat` error paths (missing key, bad body, rate-limit) return clean JSON; streaming path exercised by the user with a real key — grounded answers confirmed working after the search-grounding upgrade.
 - Chat sheet, cat animations, hidden-Models behavior, and swipe wrapper all confirmed rendering; swipe gesture physics awaiting on-device feel test.
@@ -99,3 +100,5 @@ Per-tab: search, time-window filter, sort modes (Top / New / Discussed / Weeks),
 5. If chat goes public: pre-classification or Firebase App Check on top of the prompt guardrail.
 6. Native iOS app — same `/api/chat` + `/api/items` backend would serve it; PWA covers current needs.
 7. **Multi-refresh per day** (GitHub Actions cron hitting `/api/refresh`, or stale-while-revalidate on app open) — proposed 2026-07-07, deliberately deferred by the user.
+8. **User-editable topic watchlist** (tabled 2026-07-09, evaluated as the highest-ROI "profile" feature) — surface the `lib/editorial.ts` watchlist as editable topic chips (in the ⋯ masthead menu or atop Saved): user-added terms (e.g. "interpretability", a lab, a model name) stored in Redis next to the blob, merged into the watchlist regexes at refresh so matches get force-included in digest candidates and a `◈ WATCHED` kicker on cards. Deliberately boost/highlight, **not** filter/re-rank — the app's thesis is editorial traction ranking, and scores live in one shared server-side blob anyway. A dedicated fifth "Profile" tab was considered and rejected: SAVED absorbs notes + (future) chat artifacts, the ⋯ menu absorbs preferences; the 4-mode nav stays.
+9. **Chat-generated summaries/artifacts saved in-app** (tabled 2026-07-09) — let Snap produce a saveable summary/digest of an item or topic that persists as a document in the app. No new cost: same Gemini free-tier key via a variant of `/api/chat` (longer `maxOutputTokens`, different system prompt); store in localStorage or Upstash free tier. Main budget is free-tier quota (summaries are longer generations) — keep the per-IP rate limit on any new endpoint.

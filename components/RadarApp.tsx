@@ -15,6 +15,7 @@ import ItemCard from "./ItemCard";
 import LlmBoard from "./LlmBoard";
 import Briefing from "./Briefing";
 import ChatSheet from "./ChatSheet";
+import NoteSheet, { type NoteTarget } from "./NoteSheet";
 import SavedList from "./SavedList";
 import ThemeMenu from "./ThemeMenu";
 import RadarRings from "./RadarRings";
@@ -66,6 +67,7 @@ export default function RadarApp() {
   const [mode, setMode] = useState<Mode>("brief");
   const [lane, setLane] = useState<ItemType | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [noteTarget, setNoteTarget] = useState<NoteTarget | null>(null);
   const [search, setSearch] = useState("");
   const [windowFilter, setWindowFilter] = useState<number | null>(null); // days; null = full lane window
   const [sort, setSort] = useState<SortMode>("top");
@@ -469,7 +471,9 @@ export default function RadarApp() {
             <Briefing tabs={data.tabs} visit={visit} digest={data.digest} />
           )}
 
-          {mode === "saved" && <SavedList visit={visit} />}
+          {mode === "saved" && (
+            <SavedList visit={visit} onNote={setNoteTarget} />
+          )}
 
           {mode === "feeds" &&
             data &&
@@ -520,6 +524,8 @@ export default function RadarApp() {
                         onOpen={visit.markOpened}
                         isSaved={visit.isSaved(it.id)}
                         onToggleSave={visit.toggleSaved}
+                        note={visit.notes[it.id]?.text}
+                        onNote={setNoteTarget}
                       />
                     ))}
                   </Fragment>
@@ -556,6 +562,8 @@ export default function RadarApp() {
                       onOpen={visit.markOpened}
                       isSaved={visit.isSaved(it.id)}
                       onToggleSave={visit.toggleSaved}
+                      note={visit.notes[it.id]?.text}
+                      onNote={setNoteTarget}
                     />
                   </Fragment>
                 );
@@ -606,6 +614,19 @@ export default function RadarApp() {
         </nav>
 
         <ChatSheet open={chatOpen} onOpenChange={setChatOpen} />
+
+        {noteTarget && (
+          <NoteSheet
+            key={noteTarget.id}
+            target={noteTarget}
+            initial={visit.notes[noteTarget.id]?.text ?? ""}
+            onSave={(text) => {
+              visit.setNote(noteTarget, text);
+              setNoteTarget(null);
+            }}
+            onClose={() => setNoteTarget(null)}
+          />
+        )}
       </main>
     </>
   );
