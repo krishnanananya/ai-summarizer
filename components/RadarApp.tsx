@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CachedBlob, Item, ItemType } from "@/lib/types";
 import { useVisit } from "@/lib/visit";
 import { useSwipeNav } from "./useSwipeNav";
@@ -67,30 +74,45 @@ export default function RadarApp() {
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   // Lab shortcut persists across tab switches — "following a company" mode.
   const [labFilter, setLabFilter] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const visit = useVisit();
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = () =>
+  const load = useCallback(
+    () =>
       fetch("/api/items")
         .then((r) => r.json())
         .then((d: ApiPayload) => {
-          if (cancelled) return;
           setData(d);
-          const firstEnabled = TYPE_ORDER.find((t) => d.config[t]?.enabled);
-          if (active !== "brief" && firstEnabled && !d.config[active]?.enabled)
-            setActive(firstEnabled);
+          setActive((cur) => {
+            const firstEnabled = TYPE_ORDER.find((t) => d.config[t]?.enabled);
+            return cur !== "brief" && firstEnabled && !d.config[cur]?.enabled
+              ? firstEnabled
+              : cur;
+          });
         })
-        .catch((e) => !cancelled && setError(String(e)));
+        .catch((e) => setError(String(e))),
+    []
+  );
+
+  useEffect(() => {
     load();
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", onFocus);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [load]);
+
+  // Manual refresh: kicks the server pipeline (debounced server-side to one
+  // run per 30 min), then re-pulls the blob. The run takes ~20-40s.
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetch("/api/refresh", { method: "POST" });
+    } catch {
+      /* surfaced via the unchanged "updated" timestamp */
+    }
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   const switchTab = (t: TabKey) => {
     setActive(t);
@@ -284,6 +306,24 @@ export default function RadarApp() {
                   ✓ Caught up
                 </button>
               )}
+              <button
+                aria-label="Refresh feed"
+                disabled={refreshing}
+                onClick={refresh}
+                className="rounded-lg bg-zinc-200/70 p-1.5 text-zinc-600 transition-all active:scale-95 disabled:opacity-70 dark:bg-zinc-900 dark:text-zinc-400"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                  <path d="M20 3v4h-4" />
+                </svg>
+              </button>
             </span>
           )}
         </div>

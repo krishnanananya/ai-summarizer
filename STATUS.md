@@ -27,6 +27,7 @@ Per-tab: search, time-window filter, sort modes (Top / New / Discussed / Weeks),
 - **Summary backfill**: second Gemini call writes one-sentence summaries into the top ~40 articles that arrived title-only (HN). Both calls run in parallel with 15s timeouts and `thinkingBudget: 0`.
 - **Since your last visit / Still trending**: Today partitions tiles by the visit boundary instead of just preferring new items; cross-section dedup by id + near-duplicate title.
 - **✓ Caught up** button (header, shown when anything is new) advances the visit boundary to now — clears all badges without waiting out the 30-min session gap.
+- **Manual refresh button** (header, added 2026-07-09): POST `/api/refresh` needs no secret — debounced server-side (no-op under 30-min blob age, returns `fresh`) plus a Redis NX / module-state lock against concurrent runs; the cron GET keeps its `CRON_SECRET`. Spinner runs for the ~20–40s pipeline, then the client re-pulls `/api/items`.
 - **Saved for later**: bookmark toggle on cards and tiles stores snapshots (`{id,type,title,url,savedAt}`, cap 100) in localStorage so links outlive feed windows; listed with remove buttons at the bottom of Today.
 
 ### Snap le Chat (chatbot)
