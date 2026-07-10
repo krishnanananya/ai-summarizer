@@ -31,7 +31,7 @@ No env vars are required locally: without Upstash creds the cache falls back to 
 
 1. Push this repo to GitHub and import it in Vercel (framework auto-detects Next.js).
 2. **Cron** is already configured in `vercel.json` (`0 8 * * *` — once daily, the Hobby-tier maximum). Nothing to click; it activates on deploy.
-3. **KV storage**: in the Vercel dashboard → Storage → Marketplace → add **Upstash Redis** (free tier) and connect it to the project. It injects `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` automatically.
+3. **KV storage**: in the Vercel dashboard → Storage → Marketplace → add **Upstash Redis** (free tier) and connect it to the project. It injects the Redis credentials automatically — depending on how the store is connected, Vercel names them either `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` or `KV_REST_API_URL` / `KV_REST_API_TOKEN`; the app accepts both. (If a refresh errors with `ENOENT: mkdir '.cache'`, the app isn't seeing either pair — check Project → Settings → Environment Variables and redeploy.)
 4. **Secure the cron**: Project → Settings → Environment Variables → add `CRON_SECRET` (any random string). Vercel Cron automatically sends it as `Authorization: Bearer <CRON_SECRET>`.
 5. Deploy, then trigger the first refresh manually: `curl -H "Authorization: Bearer <CRON_SECRET>" https://<your-app>.vercel.app/api/refresh`.
 
