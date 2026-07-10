@@ -6,15 +6,25 @@ const HISTORY_KEY = "radar:llm-history";
 
 // Upstash Redis in production (Vercel Marketplace, free tier); local JSON file
 // fallback for dev so the app runs with zero accounts configured.
+// The Vercel Marketplace integration injects KV_REST_API_* names (Vercel KV
+// convention); a direct Upstash setup uses UPSTASH_REDIS_REST_*. Accept both.
+function redisCreds(): { url: string; token: string } | null {
+  const url =
+    process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token =
+    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  return url && token ? { url, token } : null;
+}
+
 function hasRedis(): boolean {
-  return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-  );
+  return redisCreds() !== null;
 }
 
 async function redis() {
   const { Redis } = await import("@upstash/redis");
-  return Redis.fromEnv();
+  const creds = redisCreds();
+  if (!creds) throw new Error("redis credentials missing");
+  return new Redis(creds);
 }
 
 const FILE_PATH = ".cache/results.json";
